@@ -265,7 +265,7 @@ jobs:
           dHJpbmc7SUxqYXZhL2xhbmcvU3RyaW5nO0xqYXZhL2xhbmcvU3RyaW5nO0xqYXZhL2xhbmcvU3RyaW5nO0xvcmcvdGVsZWdyYW0vdGduZXQvUmVxdWVzdFRp
           bWVEZWxlZ2F0ZTspSiIsICh2b2lkICopIGNoZWNrUHJveHl9LAogICAgICAgICB7Im5hdGl2ZV9vbkhvc3ROYW1lUmVzb2x2ZWQiLCAiKExqYXZhL2xhbmcv
           U3RyaW5nO0pMamF2YS9sYW5nL1N0cmluZzspViIsICh2b2lkICopIG9uSG9zdE5hbWVSZXNvbHZlZH0sCg==
-PATCH64
+          PATCH64
           tr -d ' \n\r\t' < /tmp/multi_account_100.patch.b64 | base64 -d > /tmp/multi_account_100.patch
 
           git apply --check /tmp/multi_account_100.patch
