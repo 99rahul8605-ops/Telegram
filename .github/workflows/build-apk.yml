@@ -392,11 +392,49 @@ jobs:
               "configuration_version": "1",
           }
 
-          gs = Path("TMessagesProj/google-services.json")
-          gs.write_text(json.dumps(gs_data, indent=2), encoding="utf-8")
+          # Telegram keeps separate google-services.json files in multiple Android modules.
+          # Write the same debug config to every module that contains one.
+          google_service_targets = [
+              Path("TMessagesProj/google-services.json"),
+              Path("TMessagesProj_App/google-services.json"),
+              Path("TMessagesProj_AppStandalone/google-services.json"),
+              Path("TMessagesProj_AppHockeyApp/google-services.json"),
+              Path("TMessagesProj_AppHuawei/google-services.json"),
+          ]
+
+          written = []
+          payload = json.dumps(gs_data, indent=2)
+          for gs in google_service_targets:
+              if gs.parent.exists():
+                  gs.write_text(payload, encoding="utf-8")
+                  written.append(str(gs))
+
           print("Generated debug google-services.json for:", app_package, app_package + ".beta", app_package + ".web")
+          print("Updated Google Services files:", written)
 
           print("App configuration applied.")
+
+      - name: Verify standalone Firebase package entries
+        shell: python
+        run: |
+          import json, os
+          from pathlib import Path
+
+          p = Path("TMessagesProj_AppStandalone/google-services.json")
+          data = json.loads(p.read_text(encoding="utf-8"))
+          pkgs = [
+              c.get("client_info", {}).get("android_client_info", {}).get("package_name")
+              for c in data.get("client", [])
+          ]
+          required = {
+              os.environ["APP_PACKAGE"],
+              os.environ["APP_PACKAGE"] + ".beta",
+              os.environ["APP_PACKAGE"] + ".web",
+          }
+          print("Standalone Firebase packages:", pkgs)
+          missing = required.difference(pkgs)
+          if missing:
+              raise SystemExit(f"Missing Firebase package entries: {sorted(missing)}")
 
       - name: Make Gradle wrapper executable
         run: chmod +x ./gradlew
