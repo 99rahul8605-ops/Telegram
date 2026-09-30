@@ -385,6 +385,12 @@ jobs:
                   "storage_bucket": "debug-build-only.appspot.com",
               },
               "client": [
+                  # Original Telegram package IDs are still used by some shared/base modules.
+                  firebase_client("org.telegram.messenger", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+                  firebase_client("org.telegram.messenger.beta", "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+                  firebase_client("org.telegram.messenger.web", "cccccccccccccccccccccccccccccccc"),
+
+                  # Custom application package IDs used by the standalone APK variants.
                   firebase_client(app_package, "00000000000000000000000000000000"),
                   firebase_client(app_package + ".beta", "11111111111111111111111111111111"),
                   firebase_client(app_package + ".web", "22222222222222222222222222222222"),
@@ -427,6 +433,9 @@ jobs:
               for c in data.get("client", [])
           ]
           required = {
+              "org.telegram.messenger",
+              "org.telegram.messenger.beta",
+              "org.telegram.messenger.web",
               os.environ["APP_PACKAGE"],
               os.environ["APP_PACKAGE"] + ".beta",
               os.environ["APP_PACKAGE"] + ".web",
