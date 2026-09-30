@@ -360,22 +360,41 @@ jobs:
                   changed += 1
           print(f"Updated app name in {changed} locale file(s).")
 
-          # Keep the checked-in dummy google-services.json buildable after package rename.
-          # For real FCM notifications, replace this file with YOUR Firebase config later.
-          gs = Path("TMessagesProj/google-services.json")
-          if gs.exists():
-              data = json.loads(gs.read_text(encoding="utf-8"))
-              old_to_new = {
-                  "org.telegram.messenger": app_package,
-                  "org.telegram.messenger.beta": app_package + ".beta",
-                  "org.telegram.messenger.web": app_package + ".web",
+          # Generate a build-only google-services.json matching our renamed package variants.
+          # This makes the debug APK compile. For real Firebase/FCM push notifications,
+          # replace it later with a google-services.json from your own Firebase project.
+          def firebase_client(pkg, app_id_suffix):
+              return {
+                  "client_info": {
+                      "mobilesdk_app_id": f"1:123456789012:android:{app_id_suffix}",
+                      "android_client_info": {"package_name": pkg},
+                  },
+                  "oauth_client": [],
+                  "api_key": [{"current_key": "AIzaSyDUMMY_KEY_FOR_DEBUG_BUILD_ONLY_123456"}],
+                  "services": {
+                      "appinvite_service": {
+                          "other_platform_oauth_client": []
+                      }
+                  },
               }
-              for client in data.get("client", []):
-                  info = client.get("client_info", {}).get("android_client_info", {})
-                  pkg = info.get("package_name")
-                  if pkg in old_to_new:
-                      info["package_name"] = old_to_new[pkg]
-              gs.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+          gs_data = {
+              "project_info": {
+                  "project_number": "123456789012",
+                  "project_id": "debug-build-only",
+                  "storage_bucket": "debug-build-only.appspot.com",
+              },
+              "client": [
+                  firebase_client(app_package, "00000000000000000000000000000000"),
+                  firebase_client(app_package + ".beta", "11111111111111111111111111111111"),
+                  firebase_client(app_package + ".web", "22222222222222222222222222222222"),
+              ],
+              "configuration_version": "1",
+          }
+
+          gs = Path("TMessagesProj/google-services.json")
+          gs.write_text(json.dumps(gs_data, indent=2), encoding="utf-8")
+          print("Generated debug google-services.json for:", app_package, app_package + ".beta", app_package + ".web")
 
           print("App configuration applied.")
 
