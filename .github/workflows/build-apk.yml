@@ -1862,6 +1862,65 @@ jobs:
           git apply /tmp/mychat_v76.patch
           echo "MyChat v7.6 patch applied."
 
+      - name: Apply MyChat restricted-content gallery save patch
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path("TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java")
+          text = path.read_text(encoding="utf-8")
+          old = "        boolean noforwardsOrPaidMedia = noforwards || message.type == MessageObject.TYPE_PAID_MEDIA;"
+          new = old + "\n        // Keep forward/share restrictions, but allow a local gallery/download copy for visible media.\n        boolean allowMyChatRestrictedSave = !noforwardsOrPaidMedia || currentEncryptedChat == null && !isEphemeral && !message.isExpiredStory();"
+          if text.count(old) != 2:
+              raise SystemExit("Expected Telegram message-menu restriction markers")
+          marker = text.rfind(old)
+          text = text[:marker] + text[marker:].replace(old, new, 1)
+          start = text.index("    public void fillMessageMenu(")
+          end = text.index("\n    }\n\n    private", start)
+          menu = text[start:end]
+          for before, after in {
+              "selectedObject.type == MessageObject.TYPE_POLL && !noforwardsOrPaidMedia": "selectedObject.type == MessageObject.TYPE_POLL && allowMyChatRestrictedSave",
+              "selectedObject.isMusic() && !noforwardsOrPaidMedia": "selectedObject.isMusic() && allowMyChatRestrictedSave",
+              "selectedObject.isDocument() && !noforwardsOrPaidMedia": "selectedObject.isDocument() && allowMyChatRestrictedSave",
+              "type == 3 && !noforwardsOrPaidMedia": "type == 3 && allowMyChatRestrictedSave",
+              "!noforwardsOrPaidMedia && !selectedObject.hasRevealedExtendedMedia()": "allowMyChatRestrictedSave && !selectedObject.hasRevealedExtendedMedia()",
+              "!noforwardsOrPaidMedia && !selectedObject.isVoiceOnce()": "allowMyChatRestrictedSave && !selectedObject.isVoiceOnce()",
+              "type == 6 && !noforwardsOrPaidMedia": "type == 6 && allowMyChatRestrictedSave",
+              "type == 4 && !noforwardsOrPaidMedia": "type == 4 && allowMyChatRestrictedSave",
+          }.items():
+              menu = menu.replace(before, after)
+          share = "                            items.add(LocaleController.getString(R.string.ShareFile));\n                            options.add(OPTION_SHARE);\n                            icons.add(R.drawable.msg_shareout);"
+          shared = "                            if (!noforwardsOrPaidMedia) {\n                                items.add(LocaleController.getString(R.string.ShareFile));\n                                options.add(OPTION_SHARE);\n                                icons.add(R.drawable.msg_shareout);\n                            }"
+          menu = menu.replace(share, shared)
+          text = text[:start] + menu + text[end:]
+          text = text.replace("messageObject.isMusic() && !noforwards", "messageObject.isMusic() && !messageObject.isEphemeral() && !messageObject.isExpiredStory()")
+          text = text.replace("messageObject.isDocument() && !noforwards", "messageObject.isDocument() && !messageObject.isEphemeral() && !messageObject.isExpiredStory()")
+          path.write_text(text, encoding="utf-8")
+
+          # The full-screen viewer uses a separate gallery button. Keep sharing hidden,
+          # but keep Gallery visible for normal protected media; preserve ephemeral media rules.
+          viewer = Path("TMessagesProj/src/main/java/org/telegram/ui/PhotoViewer.java")
+          viewer_text = viewer.read_text(encoding="utf-8")
+          old_viewer = ("            if (isEmbedVideo || newMessageObject.messageOwner.ttl != 0 && newMessageObject.messageOwner.ttl < 60 * 60 || noforwards) {\n"
+                        "                allowShare = false;\n"
+                        "                galleryButton.setVisibility(View.GONE);\n"
+                        "                galleryGap.setVisibility(View.GONE);\n"
+                        "                menuItem.hideSubItem(gallery_menu_share);\n"
+                        "                setItemVisible(editItem, false, animated);\n"
+                        "            } else {\n"
+                        "                allowShare = true;")
+          new_viewer = ("            if (isEmbedVideo || newMessageObject.messageOwner.ttl != 0 && newMessageObject.messageOwner.ttl < 60 * 60) {\n"
+                        "                allowShare = false;\n"
+                        "                galleryButton.setVisibility(View.GONE);\n"
+                        "                galleryGap.setVisibility(View.GONE);\n"
+                        "                menuItem.hideSubItem(gallery_menu_share);\n"
+                        "                setItemVisible(editItem, false, animated);\n"
+                        "            } else {\n"
+                        "                allowShare = !noforwards;")
+          if viewer_text.count(old_viewer) != 1:
+              raise SystemExit("Expected PhotoViewer gallery button block")
+          viewer.write_text(viewer_text.replace(old_viewer, new_viewer), encoding="utf-8")
+          print("Restricted-content local save support applied.")
+
       - name: Apply app configuration
         shell: python
         run: |
