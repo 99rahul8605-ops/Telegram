@@ -1893,14 +1893,15 @@ jobs:
                   }"""
           assert s.count(old) == 1, "Account list section changed"
           s = s.replace(old, new, 1)
-          a = "        final boolean walletAbove = "
-          assert s.count(a) == 1, "Wallet marker missing"
           quick = """        if (UserConfig.getActivatedAccountsCount() < UserConfig.MAX_ACCOUNT_COUNT) {
                       items.add(SettingCell.Factory.of(99, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.msg_addbot, "+ Add Account", null));
                       items.add(UItem.asShadow(null));
                   }
           """
-          s = s.replace(a, quick + a, 1)
+          # The account list was replaced above; append the shortcut directly after it.
+          # Avoid coupling this insertion to an unrelated wallet UI marker.
+          assert s.count(new) == 1, "Updated account list marker missing"
+          s = s.replace(new, new + "\n" + quick, 1)
           a = "        switch (item.id) {"
           start = s.index("    private void onClick(UItem item, View view, int position, float x, float y) {")
           pos = s.index(a, start)
