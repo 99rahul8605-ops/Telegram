@@ -1862,6 +1862,66 @@ jobs:
           git apply /tmp/mychat_v76.patch
           echo "MyChat v7.6 patch applied."
 
+      - name: Apply MyChat v7.7 compact accounts and quick add
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path("TMessagesProj/src/main/java/org/telegram/ui/SettingsActivity.java")
+          s = p.read_text(encoding="utf-8")
+          if "myChatAccountsExpanded" in s:
+              raise SystemExit("Already applied")
+          a = "    private ArrayList<Integer> accountNumbers = new ArrayList<>();"
+          assert s.count(a) == 1, "Account field marker missing"
+          s = s.replace(a, "    private boolean myChatAccountsExpanded = false;\n" + a, 1)
+          old = """        if (accountNumbers.size() > 0) {
+                      items.add(UItem.asHeader(getString(R.string.SettingsAccounts)));
+                      for (int i = 0; i < accountNumbers.size(); ++i) {
+                          items.add(AccountCell.Factory.of(i, accountNumbers.get(i)));
+                      }
+                      items.add(UItem.asShadow(null));
+                  }"""
+          new = """        if (accountNumbers.size() > 0) {
+                      items.add(UItem.asHeader(getString(R.string.SettingsAccounts)));
+                      final int shownAccounts = myChatAccountsExpanded ? accountNumbers.size() : Math.min(5, accountNumbers.size());
+                      for (int i = 0; i < shownAccounts; ++i) {
+                          items.add(AccountCell.Factory.of(i, accountNumbers.get(i)));
+                      }
+                      if (accountNumbers.size() > 5) {
+                          items.add(SettingCell.Factory.of(98, IconBackgroundColors.BLUE.top, IconBackgroundColors.BLUE.bottom, R.drawable.ic_ab_other, myChatAccountsExpanded ? "Show less" : "More (" + (accountNumbers.size() - 5) + " accounts)", null));
+                      }
+                      items.add(UItem.asShadow(null));
+                  }"""
+          assert s.count(old) == 1, "Account list section changed"
+          s = s.replace(old, new, 1)
+          a = "        final boolean walletAbove = "
+          assert s.count(a) == 1, "Wallet marker missing"
+          quick = """        if (UserConfig.getActivatedAccountsCount() < UserConfig.MAX_ACCOUNT_COUNT) {
+                      items.add(SettingCell.Factory.of(99, IconBackgroundColors.GREEN.top, IconBackgroundColors.GREEN.bottom, R.drawable.msg_addbot, "+ Add Account", null));
+                      items.add(UItem.asShadow(null));
+                  }
+          """
+          s = s.replace(a, quick + a, 1)
+          a = "        switch (item.id) {"
+          start = s.index("    private void onClick(UItem item, View view, int position, float x, float y) {")
+          pos = s.index(a, start)
+          handlers = """        if (item.id == 98) {
+                      myChatAccountsExpanded = !myChatAccountsExpanded;
+                      listView.adapter.update(true);
+                      return;
+                  } else if (item.id == 99) {
+                      for (int account = 0; account < UserConfig.MAX_ACCOUNT_COUNT; account++) {
+                          if (!UserConfig.getInstance(account).isClientActivated()) {
+                              presentFragment(new LoginActivity(account));
+                              return;
+                          }
+                      }
+                      return;
+                  }
+          """
+          s = s[:pos] + handlers + s[pos:]
+          p.write_text(s, encoding="utf-8")
+          print("MyChat v7.7 quick account controls applied")
+
       - name: Apply MyChat restricted-content gallery save patch
         shell: python
         run: |
