@@ -1,4 +1,4 @@
-name: Build MyChat v7.6 Android APK
+name: Build MyChat v7.7 Android APK
 
 on:
   workflow_dispatch:
